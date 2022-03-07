@@ -27,10 +27,10 @@ nodes = {
         "mac": "10:00:00:00:00:{:02x}",
         "ip": "192.168.100.1/24"
     },
-    "server2": {
-        "mac": "20:00:00:00:00:{:02x}",
-        "ip": "192.168.100.2/24"
-    },
+    #"server2": {
+    #    "mac": "20:00:00:00:00:{:02x}",
+    #    "ip": "192.168.100.2/24"
+    #},
     "client": {
         "mac": "30:00:00:00:00:{:02x}",
         "ip": "192.168.100.3/24"
@@ -57,11 +57,16 @@ class PySwitchTopo(Topo):
         #   server2 
         #
 
+        #After the server2 1s deleted, the topology is like:
+        #
+        #   server1 ---- hub ---- client
+        #
+
         nodeconfig = {"cpu": -1}
 
-        for node in nodes.keys():
+        for node in nodes.keys():   #add nodes in the topology
             self.addHost(node, **nodeconfig)
-        for node in nodes.keys():
+        for node in nodes.keys():   #connect non-hub hosts with hub so the topology is connected.
             # all links are 10Mb/s, 100 millisecond prop delay
             if node != "hub":
                 self.addLink(node, "hub", bw=10, delay="100ms")

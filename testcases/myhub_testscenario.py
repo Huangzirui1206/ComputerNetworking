@@ -92,6 +92,28 @@ def test_hub():
         ("The hub should not do anything in response to a frame arriving with"
          " a destination address referring to the hub itself.")
     )
+
+    # test case 4:Similar to test case 3, a frame with dest address of one of the interfaces should
+    # result in nothing happening
+    # the packet arrives at eth1 but aims at eth1
+    reqpkt = new_packet(
+        "20:00:00:00:00:01",
+        "10:00:00:00:00:02",
+        '192.168.1.100',
+        '172.16.42.2'
+    )
+    s.expect(
+        PacketInputEvent("eth1", reqpkt, display=Ethernet),
+        ("An Ethernet frame should arrive on eth1 with destination address "
+         "the same as eth1's MAC address")
+    )
+    s.expect(
+        PacketInputTimeoutEvent(1.0),
+        ("The hub should not do anything in response to a frame arriving with"
+         " a destination address referring to the hub itself.")
+    )
+
+
     return s
 
 
