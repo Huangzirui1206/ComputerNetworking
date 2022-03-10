@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python251
 
 '''
 Ethernet hub in Switchyard.
@@ -29,6 +29,7 @@ def main(net: switchyard.llnetbase.LLNetBase):
             log_info("Received a non-Ethernet packet?!")
             return
         if eth.dst in mymacs:
+            in_cnt += 1
             log_info("Received a packet intended for me")
         else:
             in_cnt += 1 
