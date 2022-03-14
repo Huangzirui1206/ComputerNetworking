@@ -8,13 +8,45 @@ that doesn't learn.)
 import switchyard
 from switchyard.lib.userlib import *
 
+'''
+Evict entries according to least_traffic_volume rule.
+Define class LTVCache to realise this function.
+self.ndict  'address:interface_name'
+self.vdict  'address:traffic_volume'
+'''
+class LTVCache:
+    def __init__(self, size = 5):
+        self.ndict = {}
+        self.vdict = {}
+        self.size = size
+    
+    def set(self, key, value):
+        if key in self.ndict:
+            if self.ndict[key] !=  value:
+                self.ndict[key] = value
+                self.vdict[key] = 0
+        else:
+            if len(self.ndict) >= self.size:
+                min_key = min(self.vdict, key = lambda k:self.vdict[k])
+                self.ndict.pop(min_key)
+                self.vdict.pop(min_key)
+            self.ndict[key] = value
+            self.vdict[key] = 0
+
+    def get(self, key):
+        if key in self.ndict:
+            self.vdict[key] += 1
+            return self.ndict[key]
+        else:
+            return None
+            
+
 
 def main(net: switchyard.llnetbase.LLNetBase):
     my_interfaces = net.interfaces()
     mymacs = [intf.ethaddr for intf in my_interfaces]
 
-    macdict = {} # macdict is a dictionary of mac_address:port_name 
-                 # It works as a forwarding table.
+    macdict = LTVCache()    # It works as a forwarding table.
 
     while True:
         try:
@@ -32,16 +64,17 @@ def main(net: switchyard.llnetbase.LLNetBase):
     
         # Record the source address.
         log_info (f"Receive packet {packet} from {fromIface}, record it in macdict")
-        macdict[eth.src] = fromIface
+        macdict.set(eth.src, fromIface)
 
         if eth.dst in mymacs:
             # Drop the frame intended for self
             log_info("Received a packet intended for me")
         else:
             # Search macdict first. If eth.dst is found, forward frame exactly; otherwise flood.
-            if eth.dst in macdict:
+            outIntf = macdict.get(eth.dst)
+            if outIntf != None:
                 for intf in my_interfaces:
-                    if intf.name == macdict[eth.dst]:
+                    if intf.name == outIntf:
                         log_info (f"Forwarding packet {packet} to {intf.name}")
                         net.send_packet(intf, packet)
                         break
