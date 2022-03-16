@@ -109,9 +109,7 @@ def test_switch():
         #20, eth0   6s
         ###
 
-    # test case 3: a frame with any unicast address except one assigned to hub
-    # interface should be sent out all ports except ingress
-    # The destination port is not in the forwarding table.
+    # test case 3: 
     reqpkt = new_packet(
         "40:00:00:00:00:03",
         "20:00:00:00:00:01",

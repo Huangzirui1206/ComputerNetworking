@@ -25,13 +25,13 @@ class LRUCache:
         self.list = []
 
     def set(self, key, value):
-        flag = False
         if key in self.dict:
             self.list.remove(key)
         elif len(self.dict) == self.size:
             lru_key = self.list.pop()
+            # For deploying
+            log_info(f"According to the LRU rule, {lru_key} is evicted out forwarding table.")
             self.dict.pop(lru_key)
-            flag = True
         self.list.insert(0, key)
         self.dict[key] = value
 

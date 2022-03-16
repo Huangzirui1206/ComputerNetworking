@@ -28,6 +28,7 @@ class LTVCache:
         else:
             if len(self.ndict) >= self.size:
                 min_key = min(self.vdict, key = lambda k:self.vdict[k])
+                log_info(f"According to the LTV rule, {min_key} is evicted out forwarding table.")
                 self.ndict.pop(min_key)
                 self.vdict.pop(min_key)
             self.ndict[key] = value

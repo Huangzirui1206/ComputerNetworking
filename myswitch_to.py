@@ -25,14 +25,16 @@ def main(net: switchyard.llnetbase.LLNetBase):
         try:
             _, fromIface, packet = net.recv_packet()
         except NoPackets:
-            # Check whether forwarding table entries are out of time
-            cur_time = time.time()
-            for addr in list(macdict):
-                if cur_time - macdict[addr][1] >= 10:
-                    del macdict[addr]
             continue
         except Shutdown:
             break
+
+        # Check whether forwarding table entries are out of time
+        cur_time = time.time()
+        for addr in list(macdict):
+            if cur_time - macdict[addr][1] >= 10:
+                log_info(f"The entry \"{addr}:{macdict[addr]}\" is evicted At time {cur_time}")
+                del macdict[addr]
 
         log_debug (f"In {net.name} received packet {packet} on {fromIface}")
         eth = packet.get_header(Ethernet)

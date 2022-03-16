@@ -31,7 +31,7 @@ from switchyard.lib.userlib import *
     (evict d)
     (b5,a2,c2,e1,f0) 
 8.  a to d
-    d to a * e is out of table, flood
+    d to a * d is out of table, flood
     (b5,a3,c2,d1,e1)
 '''
 
