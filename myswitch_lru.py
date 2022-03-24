@@ -26,7 +26,10 @@ class LRUCache:
 
     def set(self, key, value):
         if key in self.dict:
-            self.list.remove(key)
+            if self.dict[key]!=value:
+                self.list.remove(key)
+            else :  #If the entry is in the dict, do nothing.
+                return
         elif len(self.dict) == self.size:
             lru_key = self.list.pop()
             # For deploying
