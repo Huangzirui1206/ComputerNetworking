@@ -29,10 +29,11 @@ class ForwardingTable(object):  #static forwarding table
         ipaddr_num = int(IPv4Address(ipaddr))
         netmask_num = int(IPv4Address(netmask))
         prefix = ipaddr_num & netmask_num
-        self.dict[ipaddr] = {'prefix':prefix, 'netmask_num':netmask_num, 'nexthop':nexthop, 'intf':intf}
+        self.dict[IPv4Address(ipaddr)] = {'prefix':prefix, 'netmask_num':netmask_num, 'nexthop':nexthop, 'intf':intf}
 
     def prefix_match(self, destaddr):
-        destaddr_num = int(IPv4Address(destaddr))
+        destaddr = IPv4Address(destaddr)
+        destaddr_num = int(destaddr)
         # Considering the longest prefix matching rule
         matched_key = None
         for key in self.dict:
@@ -98,17 +99,13 @@ class Router(object):
                 return -1 # drop packet
             else: # The hwaddr not recorded in arpCache need an arp request
                 # send arp request  
-                flag = False
-                if nexthop == '0.0.0.0':    # Assume the next hop is the destination
-                    flag = self.send_arpRequest(ipheader.dst)
-                else:
-                    flag = self.send_arpRequest(nexthop)
+                flag = self.send_arpRequest(nexthop)
                 if flag: # If the arp request is sended successfully
                     # put entry into ipqueue and wait for arp reply
                     # At this stage the packet has no data
                     return cnt+1
                 else:
-                    return -1
+                    return -1 # in case of accidental failure
         else: # The targethwaddr has already been in the arp cache
             ipheader.ttl = ipheader.ttl - 1 # TTL decreace 
             # At this stage, just assume the TTL will not be expired
