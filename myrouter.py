@@ -93,7 +93,7 @@ class Router(object):
             targetIntf = self.ipaddr_in_router(arp.targetprotoaddr)
             if targetIntf is not None:
                 pkt = create_ip_arp_reply(targetIntf.ethaddr, arp.senderhwaddr, targetIntf.ipaddr, arp.senderprotoaddr) 
-                self.net.send_packet(self.name_in_router(ifaceName), pkt)
+                self.net.send_packet(targetIntf, pkt)
         elif arp.operation == ArpOperation.Reply: 
             log_info(f"Receive an ARP reply, {arp.senderprotoaddr}:{arp.senderhwaddr}")
 

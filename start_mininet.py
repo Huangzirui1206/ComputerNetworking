@@ -85,6 +85,7 @@ def setup_addressing(net):
     set_route(net, 'server1', '192.168.200.0/24', '192.168.100.2')
     set_route(net, 'server2', '10.1.0.0/16', '192.168.200.2')
     set_route(net, 'server2', '192.168.100.0/24', '192.168.200.2')
+    set_route(net, 'server2', '172.16.0.0/24', '192.168.200.2')
     set_route(net, 'client', '192.168.100.0/24', '10.1.1.2')
     set_route(net, 'client', '192.168.200.0/24', '10.1.1.2')
     set_route(net, 'client', '172.16.0.0/16', '10.1.1.2')
