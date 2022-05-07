@@ -17,13 +17,38 @@ class Blastee:
             num
     ):
         self.net = net
-        # TODO: store the parameters
-        ...
+        self.blasterIp = blasterIp
+        self.totnum = int(num)
 
     def handle_packet(self, recv: switchyard.llnetbase.ReceivedPacket):
         _, fromIface, packet = recv
         log_debug(f"I got a packet from {fromIface}")
         log_debug(f"Pkt: {packet}")
+        ackpkt = Ethernet() + IPv4() + UDP()
+        ackpkt[0].src = "20:00:00:00:00:01"
+        ackpkt[0].dst = "40:00:00:00:00:02"
+        ackpkt[0].ethertype = EtherType.IPv4
+
+        ackpkt[1].src = "192.168.200.1"
+        ackpkt[1].dst = self.blasterIp
+        ackpkt[1].ttl = 3
+        ackpkt[1].protocol = IPProtocol.UDP
+
+        ackpkt[2].src = 0
+        ackpkt[2].dst = 0
+        
+        seqbyte = packet[3].to_bytes()[:4]
+        lengthbyte = packet[3].to_bytes()[4:6]
+        length =  struct.unpack(">H",lengthbyte)[0]
+        if length < 8:
+            payload = struct.pack(">II", 0, 0)[0]
+        else:
+            payload = packet[3].to_bytes()[6:14]
+        rpc = RawPacketContents(seqbyte+payload)
+        ackpkt.insert_header(3,rpc)
+
+        self.net.send_packet(fromIface, ackpkt) 
+
 
     def start(self):
         '''A running daemon of the blastee.
