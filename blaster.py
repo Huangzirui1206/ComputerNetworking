@@ -19,6 +19,7 @@ class Blaster:
             timeout="300",
             recvTimeout="100"
     ):
+        log_info("Start Blaster")
         self.net = net
         # arguments
         self.blasteeIp = blasteeIp
@@ -62,13 +63,14 @@ class Blaster:
             widx = (seqnum - self.lhs + wbase) % self.senderWindowLenth
             if self.window[widx] is not None:
                 self.window[widx] = None
-                self.roundTime = time.time()
-                self.totnum -= 1
+                orilhs = self.lhs
                 while self.lhs < self.rhs:
                     if self.window[self.lhs % self.senderWindowLenth] is None:
                         self.lhs += 1
                     else:
                         break
+                if orilhs != self.lhs:
+                    self.roundTime = time.time()
 
     def handle_no_packet(self):
         log_debug("Didn't receive anything")
@@ -81,27 +83,28 @@ class Blaster:
 
         intf = self.net.interface_by_name("blaster-eth0")
 
-        # Window is full but time is not out -- just wait
+        # retransmit
+        if time.time() - self.roundTime >= self.timeout:
+            log_info(f"Out of time, retransmit packets. lhs = {self.lhs}, rhs = {self.rhs}")
+            for item in self.window:
+                if item is None:
+                    continue
+                else:
+                    self.reTXnum += 1
+                    self.throughput += item.size()
+                    self.net.send_packet(intf, item)
+            self.roundTime = time.time()
+            self.timeoutnum += 1
+
+        # The window is full
         if self.rhs - self.lhs + 1 == self.senderWindowLenth:
-            if time.time() - self.roundTime < self.timeout:
-                return
-            else:
-                for item in self.window:
-                    if item is None:
-                        continue
-                    else:
-                        self.reTXnum += 1
-                        self.throughput += item.size()
-                        self.net.send_packet(intf, item)
-                self.roundTime = time.time()
-                self.timeoutnum += 1
-                return 
+            return
 
         # Creating the headers for the packet
         pkt = Ethernet() + IPv4() + UDP()
         pkt[0].src = "10:00:00:00:00:01"
         pkt[0].dst = "40:00:00:00:00:01"
-        pkt[0].ethertype = EtherType.IP
+        pkt[0].ethertype = EtherType.IPv4
 
         pkt[1].src = "192.168.100.1"
         pkt[1].dst = self.blasteeIp
@@ -124,7 +127,9 @@ class Blaster:
         wbase = self.lhs % self.senderWindowLenth
         widx = (self.rhs - self.lhs + wbase) % self.senderWindowLenth
         self.window[widx] = pkt
-        self.roundTime = time.time()
+        self.totnum -= 1
+        #self.roundTime = time.time()
+        log_info(f"Send a new packet, lhs = {self.lhs}, rhs = {self.rhs}")
 
 
 

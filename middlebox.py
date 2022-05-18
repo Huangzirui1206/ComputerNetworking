@@ -17,6 +17,7 @@ class Middlebox:
             net: switchyard.llnetbase.LLNetBase,
             dropRate="0.19"
     ):
+        log_info("Start Middlebox")
         self.net = net
         self.dropRate = float(dropRate)
 
@@ -29,8 +30,10 @@ class Middlebox:
                 log_debug("The blaster packet is transmited successfully")
                 packet[0].dst = "20:00:00:00:00:01"
                 packet[0].src = "40:00:00:00:00:01"
-                packet[0].ethertype = EtherType.IPv4
-                packet[1].ttl -= 1
+                if packet.has_header(IPv4):
+                    packet[1].ttl -= 1
+                else:
+                    return
                 self.net.send_packet("middlebox-eth1", packet)
             else:
                 log_debug("The blaster packet is lost")
@@ -38,8 +41,10 @@ class Middlebox:
             log_debug(" Midflebox received from blastee")
             packet[0].dst = "10:00:00:00:00:01"
             packet[0].src = "40:00:00:00:00:01"
-            packet[0].ethertype = EtherType.IPv4
-            packet[1].ttl -= 1
+            if packet.has_header(IPv4):
+                packet[1].ttl -= 1
+            else:
+                return
             self.net.send_packet("middlebox-eth0", packet)
         else:
             log_debug("Oops :)")

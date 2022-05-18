@@ -16,6 +16,7 @@ class Blastee:
             blasterIp,
             num
     ):
+        log_info("Start Blastee")
         self.net = net
         self.blasterIp = blasterIp
         self.totnum = int(num)
@@ -40,6 +41,7 @@ class Blastee:
         seqbyte = packet[3].to_bytes()[:4]
         lengthbyte = packet[3].to_bytes()[4:6]
         length =  struct.unpack(">H",lengthbyte)[0]
+        payload = None
         if length < 8:
             payload = struct.pack(">II", 0, 0)[0]
         else:
