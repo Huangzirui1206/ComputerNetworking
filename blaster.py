@@ -40,67 +40,23 @@ class Blaster:
         self.window = [None]*self.senderWindowLenth
         # for round timing
         self.roundTime = time.time()
+        # for retransmit
+        self.reTXlist = []
+
+    
+    def send_reTX_packet(self):
+        if len(self.reTXlist) > 0:
+            intf = self.net.interface_by_name("blaster-eth0")
+            self.net.send_packet(intf, self.reTXlist[0])
+            self.reTXnum += 1
+            self.throughput += self.reTXlist[0].size()
+            del self.reTXlist[0]
+            log_info(f"retransmit a packet")
 
 
-    def print_stats(self):
-        totTime = time.time() - self.initTime
-        log_info(f"Total TX time(in seconds): {round(totTime,3)}")
-        log_info(f"Number of reTx: {self.reTXnum}")
-        log_info(f"Number of coarse TOs: {self.timeoutnum}")
-        log_info(f"Throughput(Bps): {round(self.throughput/totTime,3)}")
-        log_info(f"Goodput(Bps): {round(self.goodput/totTime,3)}")
-
-
-    def handle_packet(self, recv: switchyard.llnetbase.ReceivedPacket):
-        _, fromIface, packet = recv
-        log_debug("I got a packet")
-        seqbyte = packet[3].to_bytes()[:4]
-        seqnum = struct.unpack(">I",seqbyte)[0]
-        if seqnum < self.lhs or seqnum > self.rhs:
-            return 
-        else:
-            wbase = self.lhs % self.senderWindowLenth
-            widx = (seqnum - self.lhs + wbase) % self.senderWindowLenth
-            if self.window[widx] is not None:
-                self.window[widx] = None
-                orilhs = self.lhs
-                while self.lhs < self.rhs:
-                    if self.window[self.lhs % self.senderWindowLenth] is None:
-                        self.lhs += 1
-                    else:
-                        break
-                if orilhs != self.lhs:
-                    self.roundTime = time.time()
-
-    def handle_no_packet(self):
-        log_debug("Didn't receive anything")
-        if self.totnum == 0:
-            self.totnum = -1
-            self.print_stats()
-            return
-        elif self.totnum < 0:
-            return
-
+    def send_new_packet(self):
         intf = self.net.interface_by_name("blaster-eth0")
 
-        # retransmit
-        if time.time() - self.roundTime >= self.timeout:
-            log_info(f"Out of time, retransmit packets. lhs = {self.lhs}, rhs = {self.rhs}")
-            for item in self.window:
-                if item is None:
-                    continue
-                else:
-                    self.reTXnum += 1
-                    self.throughput += item.size()
-                    self.net.send_packet(intf, item)
-            self.roundTime = time.time()
-            self.timeoutnum += 1
-
-        # The window is full
-        if self.rhs - self.lhs + 1 == self.senderWindowLenth:
-            return
-
-        # Creating the headers for the packet
         pkt = Ethernet() + IPv4() + UDP()
         pkt[0].src = "10:00:00:00:00:01"
         pkt[0].dst = "40:00:00:00:00:01"
@@ -129,8 +85,77 @@ class Blaster:
         self.window[widx] = pkt
         self.totnum -= 1
         #self.roundTime = time.time()
-        log_info(f"Send a new packet, lhs = {self.lhs}, rhs = {self.rhs}")
+        log_info(f"Send a new packet, lhs = {self.lhs}, rhs = {self.rhs}, totnum = {self.totnum}")
+    
 
+    def send_packet(self):
+        if len(self.reTXlist) > 0:
+            self.send_reTX_packet()
+        elif self.rhs - self.lhs + 1 < self.senderWindowLenth:
+            self.send_new_packet()
+
+    
+    def handle_timeout(self):
+        # timeout
+        if time.time() - self.roundTime >= self.timeout:
+            log_info(f"Out of time, retransmit packets. lhs = {self.lhs}, rhs = {self.rhs}")
+            self.reTXlist.clear()
+            for item in self.window:
+                if item is None:
+                    continue
+                else:       
+                    self.reTXlist.append(item)
+            self.roundTime = time.time()
+            self.timeoutnum += 1
+
+
+    def recv_packet(self, packet):
+        seqbyte = packet[3].to_bytes()[:4]
+        seqnum = struct.unpack(">I",seqbyte)[0]
+        if seqnum < self.lhs or seqnum > self.rhs:
+            return 
+        else:
+            wbase = self.lhs % self.senderWindowLenth
+            widx = (seqnum - self.lhs + wbase) % self.senderWindowLenth
+            if self.window[widx] is not None:
+                self.window[widx] = None
+                orilhs = self.lhs
+                while self.lhs < self.rhs:
+                    if self.window[self.lhs % self.senderWindowLenth] is None:
+                        self.lhs += 1
+                    else:
+                        break
+                if orilhs != self.lhs:
+                    self.roundTime = time.time()
+                    # self.reTXlist.clear()
+
+
+    def print_stats(self):
+        totTime = time.time() - self.initTime
+        log_info(f"Total TX time(in seconds): {round(totTime,3)}")
+        log_info(f"Number of reTx: {self.reTXnum}")
+        log_info(f"Number of coarse TOs: {self.timeoutnum}")
+        log_info(f"Throughput(Bps): {round(self.throughput/totTime,3)}")
+        log_info(f"Goodput(Bps): {round(self.goodput/totTime,3)}")
+        
+
+    def handle_packet(self, recv: switchyard.llnetbase.ReceivedPacket):
+        _, fromIface, packet = recv
+        log_debug("I got a packet")
+        self.recv_packet(packet)
+        self.handle_no_packet()
+
+
+    def handle_no_packet(self):
+        log_debug("Didn't receive anything")
+        if self.totnum > 0:
+            self.handle_timeout()
+            self.send_packet()
+        elif self.totnum == 0:
+            self.totnum = -1
+            self.print_stats()
+        else:
+            return
 
 
     def start(self):
