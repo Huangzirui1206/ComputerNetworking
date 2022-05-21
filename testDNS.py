@@ -13,5 +13,5 @@ def resolveDomain(domain):
 result = resolveDomain("home.nasa.org")
 print(result)
 
-result = resolveDomain("test.nasa.org")
+result = resolveDomain("lab.nasa.org")
 print(result)

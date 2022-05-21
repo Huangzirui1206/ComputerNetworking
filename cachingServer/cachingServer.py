@@ -100,7 +100,21 @@ class CachingServer(TCPServer):
         Write the headers to local cache and return the body.
         '''
         # TODO: implement the logic described in doc-string
-        ...
+        if path in self.cacheTable and self.cacheTable.expired(path) is False:
+            return (self.cacheTable.getHeaders(path), self.cacheTable.getBody(path))
+
+        # else: The path entry is in not cache or is expired, fetch it from the main server
+        resp = self.requestMainServer(path)
+        if resp is not None:
+            headers = resp.getheaders()
+            body = resp.read()
+            self.cacheTable.setHeaders(path, headers)
+            self.cacheTable.appendBody(path, body)
+            return (headers, body)
+        
+        # else: the path entry is not found
+        return (None, None)
+
 
     def log_info(self, msg):
         self._logMsg("Info", msg)
@@ -143,10 +157,14 @@ class CachingServerHttpHandler(BaseHTTPRequestHandler):
     server_version = "CachingServerHTTP/" + __version__
 
     @trace
-    def sendHeaders(self):
+    def sendHeaders(self, headers):
         ''' Send HTTP headers to client'''
         # TODO: implement the logic of sending headers
-        ...
+        if headers is not None:
+            self.send_response(HTTPStatus.OK)
+            for hd in headers:
+                self.send_header(hd[0], hd[1])
+            self.end_headers()
 
     def sendBody(self, body):
         ''' Send HTTP body to client.
@@ -163,7 +181,12 @@ class CachingServerHttpHandler(BaseHTTPRequestHandler):
         '''
         # TODO: implement the logic to response a GET.
         # Remember to leverage the methods in CachingServer.
-        ...
+        headers, body = self.server.touchItem(self.path)
+        if headers is None and body is None:
+            self.send_error(HTTPStatus.NOT_FOUND, "'File not found'")
+        else:
+            self.sendHeaders(headers)
+            self.sendBody(body)                
 
     @trace
     def do_HEAD(self):
@@ -173,7 +196,11 @@ class CachingServerHttpHandler(BaseHTTPRequestHandler):
         '''
         # TODO: implement the logic to response a HEAD.
         # Similar to do_GET()
-        ...
+        headers, body = self.server.touchItem(self.path)
+        if headers is None and body is None:
+            self.send_error(HTTPStatus.NOT_FOUND, "'File not found'")
+        else:
+            self.sendHeaders(headers)
 
     def version_string(self):
         ''' Return the server software version string. '''

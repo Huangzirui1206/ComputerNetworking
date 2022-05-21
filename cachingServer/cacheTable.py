@@ -58,6 +58,7 @@ class CacheTable(UserDict):
             self.data[key].headers = headers
         else:
             self.data[key] = HTTPCacheItem(headers, bytearray())
+        self.timestamp = time.time()
 
     @trace
     def getHeaders(self, key: str):

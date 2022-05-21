@@ -11,6 +11,8 @@ import math
 import re
 from collections import namedtuple
 
+import random
+
 
 __all__ = ["DNSServer", "DNSHandler"]
 
@@ -26,11 +28,31 @@ class DNSServer(UDPServer):
         # TODO: your codes here. Parse the dns_table.txt file
         # and load the data into self._dns_table.
         # --------------------------------------------------
-        ...
+        fd = open(dns_file)
+        for line in fd:
+            line = line.strip('\n')
+            dns_entry = line.split()
+
+            dns_entry[0].strip('.')
+            pattern = dns_entry[0].replace(".","\.")
+            pattern = pattern.replace("*",".+")
+            pattern += "\.?"
+            ret_list = dns_entry[2:]
+            
+            self._dns_table.append([pattern, dns_entry[1], ret_list])
+        # ----------------------------------------------------
 
     @property
     def table(self):
         return self._dns_table
+
+
+# ------------------------------------------------
+# For calculate distance by (latitude, longitude)
+EARTH_RADIUS = 6378.137
+def rad(d):
+    return d * math.pi / 180.0
+# ------------------------------------------------
 
 
 class DNSHandler(BaseRequestHandler):
@@ -58,6 +80,15 @@ class DNSHandler(BaseRequestHandler):
     def calc_distance(self, pointA, pointB):
         ''' TODO: calculate distance between two points '''
         ...
+        if pointA is None or pointB is None:
+            return float('inf')
+        radLatA = rad(pointA[0])
+        radLatB = rad(pointB[0])
+        delta_lat = radLatA - radLatB
+        delta_lng = rad(pointA[1]) - rad(pointB[1])
+        tmp = math.pow(math.sin(delta_lat)/2, 2) + math.cos(radLatA) * math.cos(radLatB) * math.pow(math.sin(delta_lng / 2), 2) 
+        L = 2 * EARTH_RADIUS * math.asin(math.sqrt(tmp))
+        return L
 
     def get_response(self, request_domain_name):
         response_type, response_val = (None, None)
@@ -66,7 +97,35 @@ class DNSHandler(BaseRequestHandler):
         # Determine an IP to response according to the client's IP address.
         #       set "response_ip" to "the best IP address".
         client_ip, _ = self.client_address
-        ...
+
+        for item in self.table:
+            if re.match(item[0], request_domain_name): # matched
+                
+                if item[1] == "CNAME": # CNAME
+                    response_type, response_val = ("CNAME", item[2][0])
+                elif item[1] == "A": # A
+                    if len(item[2]) == 1: # only one entry in item[2]
+                        response_type, response_val = ("A", item[2][0])
+                    elif len(item[2]) == 0: # error situation
+                        self.log_error("Oops :))")
+                    else:   
+                        # Get a random IP address
+                        response_type, response_val = ("A", item[2][random.randint(0,len(item[2]) - 1)])
+                        # Get the global point
+                        clientPoint = IP_Utils.getIpLocation(client_ip)
+                        min_dis = float('inf')
+                        # Get the best IP address 
+                        if clientPoint is not None: 
+                            for ip_str in item[2]:
+                                serverPoint = IP_Utils.getIpLocation(ip_str)
+                                tmp_dis = self.calc_distance(clientPoint, serverPoint)
+                                if tmp_dis <= min_dis:
+                                    min_dis = tmp_dis
+                                    response_val = ip_str
+                else:
+                    self.log_error("Oops :))")
+
+                break
 
 
         # -------------------------------------------------
@@ -95,7 +154,7 @@ class DNSHandler(BaseRequestHandler):
             response = self.get_response(request_domain_name)
 
             # response to client with response_ip
-             if None not in response:
+            if None not in response:
                 dns_response = dns_request.generate_response(response)
             else:
                 dns_response = DNS_Request.generate_error_response(
