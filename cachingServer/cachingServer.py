@@ -39,6 +39,15 @@ CACHE_TIMEOUT = 10
 
 BUFFER_SIZE = 64 * 1024  # bytes. 64 KB
 
+def streamingFile(resp:Type[HTTPResponse]):
+    buf = bytearray(BUFFER_SIZE)
+    ret = resp.readinto(buf) 
+    if ret < BUFFER_SIZE:
+        yield buf
+        raise StopIteration
+    else:
+        yield buf
+    
 
 class CachingServer(TCPServer):
     ''' The caching server for CDN '''
@@ -99,22 +108,37 @@ class CachingServer(TCPServer):
         If the target doesn't exsit or expires, fetch from main server.
         Write the headers to local cache and return the body.
         '''
+        
         # TODO: implement the logic described in doc-string
+        
         if path in self.cacheTable and self.cacheTable.expired(path) is False:
             return (self.cacheTable.getHeaders(path), self.cacheTable.getBody(path))
 
         # else: The path entry is in not cache or is expired, fetch it from the main server
         resp = self.requestMainServer(path)
+        
         if resp is not None:
             headers = resp.getheaders()
-            body = resp.read()
             self.cacheTable.setHeaders(path, headers)
+            
+            '''
+            # Code without considering streaming file
+            body = resp.read()
             self.cacheTable.appendBody(path, body)
-            return (headers, body)
-        
+            '''
+            
+            # Code considering streaming file
+            sf_gen = streamingFile(resp)
+            for buf in sf_gen:
+                self.cacheTable.appendBody(path, buf)
+            
+
+            return (headers, self.cacheTable.getBody(path))
+            
+
         # else: the path entry is not found
         return (None, None)
-
+       
 
     def log_info(self, msg):
         self._logMsg("Info", msg)
