@@ -39,16 +39,6 @@ CACHE_TIMEOUT = 10
 
 BUFFER_SIZE = 64 * 1024  # bytes. 64 KB
 
-def streamingFile(resp:Type[HTTPResponse]):
-    buf = bytearray(BUFFER_SIZE)
-    ret = resp.readinto(buf) 
-    if ret < BUFFER_SIZE:
-        yield buf
-        raise StopIteration
-    else:
-        yield buf
-    
-
 class CachingServer(TCPServer):
     ''' The caching server for CDN '''
     def __init__(self,
@@ -101,6 +91,7 @@ class CachingServer(TCPServer):
         self.log_error(f"File not found on main server '{self.mainServerAddress}'")
         return None
 
+    
     def touchItem(self, path: str):
         ''' Touch the item of path.
         This method, called by HttpHandler, serves as a bridge of server and
@@ -108,7 +99,7 @@ class CachingServer(TCPServer):
         If the target doesn't exsit or expires, fetch from main server.
         Write the headers to local cache and return the body.
         '''
-        
+        '''
         # TODO: implement the logic described in doc-string
         
         if path in self.cacheTable and self.cacheTable.expired(path) is False:
@@ -121,24 +112,37 @@ class CachingServer(TCPServer):
             headers = resp.getheaders()
             self.cacheTable.setHeaders(path, headers)
             
-            '''
             # Code without considering streaming file
             body = resp.read()
             self.cacheTable.appendBody(path, body)
-            '''
             
-            # Code considering streaming file
-            sf_gen = streamingFile(resp)
-            for buf in sf_gen:
-                self.cacheTable.appendBody(path, buf)
-            
-
             return (headers, self.cacheTable.getBody(path))
             
-
         # else: the path entry is not found
         return (None, None)
-       
+        '''
+        # implement the logic with streaming file
+        if path in self.cacheTable and self.cacheTable.expired(path) is False:
+            yield self.cacheTable.getHeaders(path)
+            yield self.cacheTable.getBody(path)
+            raise StopIteration
+        # else: The path entry is in not cache or is expired, fetch it from the main server
+        resp = self.requestMainServer(path)
+        if resp is not None:
+            headers = resp.getheaders()
+            self.cacheTable.setHeaders(path, headers)
+            yield headers
+            buf = bytearray(BUFFER_SIZE)
+            ret = BUFFER_SIZE 
+            while ret == BUFFER_SIZE:
+                ret = resp.readinto(buf) 
+                yield buf
+                self.cacheTable.appendBody(path, buf)
+            raise StopIteration
+        yield None
+        yield bytearray()
+        raise StopIteration
+
 
     def log_info(self, msg):
         self._logMsg("Info", msg)
@@ -205,8 +209,16 @@ class CachingServerHttpHandler(BaseHTTPRequestHandler):
         '''
         # TODO: implement the logic to response a GET.
         # Remember to leverage the methods in CachingServer.
+        '''
         headers, body = self.server.touchItem(self.path)
-        if headers is None and body is None:
+        '''
+        gen = self.server.touchItem(self.path)
+        headers = next(gen)
+        body = bytearray()
+        for buf in gen:
+            body += buf
+
+        if headers is None and (body is None or len(body) == 0):
             self.send_error(HTTPStatus.NOT_FOUND, "'File not found'")
         else:
             self.sendHeaders(headers)
@@ -220,8 +232,13 @@ class CachingServerHttpHandler(BaseHTTPRequestHandler):
         '''
         # TODO: implement the logic to response a HEAD.
         # Similar to do_GET()
+        '''
         headers, body = self.server.touchItem(self.path)
-        if headers is None and body is None:
+        '''
+        gen = self.server.touchItem(self.path)
+        headers = next(gen)
+        
+        if headers is None:
             self.send_error(HTTPStatus.NOT_FOUND, "'File not found'")
         else:
             self.sendHeaders(headers)

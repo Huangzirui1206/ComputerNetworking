@@ -1,0 +1,5 @@
+2022/05/24-14:26:33| [INFO] DNS server started
+DNS server serving on 0.0.0.0:8180
+2022/05/24-14:26:35| [Info] Receving DNS request from '10.0.0.24' asking for 'stfw.localhost.computer.'
+2022/05/24-14:26:36| [Info] Receving DNS request from '10.0.0.24' asking for 'stfw.localhost.computer.'
+2022/05/24-14:26:37| [Info] Receving DNS request from '10.0.0.24' asking for 'stfw.localhost.computer.'
